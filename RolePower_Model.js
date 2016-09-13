@@ -20,9 +20,9 @@ var dataDgData = [];
 // 设置属性权限列表
 var powerPData = [];
 // 浏览操作id
-var browseOpId = '00000000000000000000000000000001';
+var browseOpId = 'model000000000000000000000000001';
 // 修改操作id
-var updateOpId = '00000000000000000000000000000002';
+var updateOpId = 'model000000000000000000000000002';
 // 添加操作id
 var addOpId = 'model000000000000000000000000003';
 // 冻结操作id
@@ -71,7 +71,7 @@ $(function () {
         ]];
     //左边结构树
     $('#acm_tree_model').tree({
-        url: eaf.getComboTreeUrl('ACM', 'GetSubModelTree') + '&clsid=' + modelClsId,
+        url: eaf.getComboTreeUrl('ACM', 'GetSubModelTree') + '&clsid=' + modelClsId + '&arg={isContainChildClasses:0}',
         animate: true,
         checkbox: false,
         lines: true,
@@ -179,10 +179,6 @@ function saveOper(obj, state, operId, modelId) {
  * @param modelId  模型ID
  */
 function loadDataPower(powerPData, modelId) {
-    //清空数据列表
-    hashDataDgOld = {};
-    //清空数据列表
-    hashDataDgNew = {};
     //清空保存数组对像
     operArraySave = [];
     //清空删除数组对像
@@ -398,18 +394,31 @@ function upDataPowers(operPData, powerPData) {
  * @param operType 模型ID下对应的操作对象 key为 "0":浏览 "1":修改 "2":冻结
  * @returns {*} 旧的数据权限 "" or "Y" or "N"
  */
-function getOldPower(hashModelId, operType) {
-    //旧的权限
-    var hashOldPower;
-    if (hashDataDgOld[hashModelId] && hashDataDgOld[hashModelId][operType]) {
-        hashOldPower = hashDataDgOld[hashModelId][operType].EAF_POWER;
-    } else {
-        hashOldPower = ""
+function getOldPower(hashModelId , operType , operNewId) {
+    //旧的权限以及操作权限ID
+    var hash={};
+    if (hashDataDgOld[hashModelId]) {
+        for(var oper in hashDataDgOld[hashModelId]){
+            if(hashDataDgOld[hashModelId][oper].EAF_OPER== operNewId){
+                hash.hashOldPower = hashDataDgOld[hashModelId][oper].EAF_POWER;
+                hash.hashId = hashDataDgOld[hashModelId][oper].EAF_ID;
+                return hash;
+            }
+            hash.hashOldPower = ""
+        }
     }
-    return hashOldPower;
+    if(!(hashDataDgOld[hashModelId] && hashDataDgOld[hashModelId][operType])){
+        hash.hashOldPower = ""
+    }
+    return hash;
 }
-// 点击确定时向后台发送数据
+/**
+ * 点击确定时向后台发送数据
+ * @returns  返回值为一个对象：key分别为flag(传向父页面的判断弹窗权限) inform(弹窗提示信息标头)  state(弹窗提示信息成功或失败)
+ */
 function getResult() {
+    //AJAX成功时候的返回值
+    var result={};
     //新的操作ID
     var operNewId = '';
     //储存操作权限集合
@@ -424,23 +433,22 @@ function getResult() {
         for (var newOperType in hashDataDgNew[newModelId]) {
             //获取新的权限
             hashNewPower = hashDataDgNew[newModelId][newOperType].EAF_POWER;
-            //从方法中调取旧的权限
-            var hashOldPower = getOldPower(newModelId, newOperType);
             //获取新的操作ID
             operNewId = hashDataDgNew[newModelId][newOperType].EAF_OPER;
+            //从方法中调取旧的权限
+            var hash = getOldPower(newModelId , newOperType , operNewId);
             //删除
-            if (hashNewPower == "" && hashOldPower != "") {
+            if (hashNewPower == "" && hash.hashOldPower !== "") {
                 //获取旧的操作权限ID
                 hashOldId = hashDataDgOld[newModelId][newOperType].EAF_ID;
                 delOperArray.push(hashOldId);
-            } else {
+            } else if(hashNewPower !== "" && hash.hashOldPower !== hashNewPower){
                 operJson = {};
                 //创建操作权限ID 在添加和修改时取值不同
                 var hashId;
-                if (hashNewPower != hashOldPower && hashOldPower != "") {
-                    hashOldId = hashDataDgOld[newModelId][newOperType].EAF_ID;
+                if (hashNewPower != hash.hashOldPower && hash.hashOldPower != "") {
                     //获取权限记录ID(此ID为oldId)
-                    hashId = hashOldId;
+                    hashId = hash.hashId;
                 } else {
                     //获取权限记录ID(此ID为新获取)
                     hashId = eaf.guid();
@@ -461,25 +469,31 @@ function getResult() {
     //ajax保存数据
     $.ajax({
         type: "POST",
-        url: eaf.saveObjByIdToFrameUrl('ACM', 'SaveModelPower'),
+        url: eaf.saveObjByIdToFrameUrl('AccessCtrl', 'SaveRolePower'),
         async: false,
         dataType: "json",
         data: {
-            objPowerClsid: objPowerClsId,
+            portalclsid: objPowerClsId,
             objarray: eaf.jsonToStr(operArraySave),
-            delobjarray: eaf.jsonToStr(delOperArray),
-            roleid: roleId,
-            orgid: orgId
+            delobjarray: eaf.jsonToStr(delOperArray)
         },
         success: function () {
-            $.messager.alert(eaf.getLabel("eaf_acm_inform"),eaf.getLabel("eaf_acm_upDateSuccess"),"info",function(b){
-                //保存数据列表中操作权限数组
-                powerPData=getOperData(modelId,nodeType);
-                //刷新页面
-                loadDataPower(powerPData, modelId)
-            });
-    }});
-    return "";
+            //清空数据列表
+            hashDataDgOld = {};
+            //清空数据列表
+            hashDataDgNew = {};
+            result.flag=true;
+            result.inform=eaf.getLabel("eaf_acm_inform");
+            result.state=eaf.getLabel("eaf_acm_updataSuccess");
+            loadDataPower(powerPData, modelId)
+        },
+        error:function () {
+            result.flag=false;
+            result.inform=eaf.getLabel("eaf_acm_inform");
+            result.state=eaf.getLabel("eaf_acm_updataFail");
+        }
+    });
+    return result;
 }
 /**
  * 某一节点下的所有子节点

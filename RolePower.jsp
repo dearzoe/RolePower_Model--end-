@@ -6,7 +6,7 @@
 	<div title=<%= I18nHelper.GetLabel(request,"eaf_login_function")%> style="padding: 0px;">
 	    <iframe id="tbs1" name="tbs1" scrolling="no" frameborder="0" style="width: 99%; height: 99%;"></iframe>
 	</div>
-	<div title=<%= I18nHelper.GetLabel(request,"eaf_login_class")%> style="padding: 0px;">
+	<div title=<%= I18nHelper.GetLabel(request,"mdm_acm_data")%> style="padding: 0px;">
 	    <iframe id="tbs2" name="tbs2" scrolling="no" frameborder="0" style="width: 99%; height: 99%;"></iframe>
 	</div>
 	<div title=<%= I18nHelper.GetLabel(request,"eaf_login_rule")%> style="padding: 0px;">
@@ -36,7 +36,16 @@
          eaf.getIframWin(window.frames["tbs1"]).getResult();
          eaf.getIframWin(window.frames["tbs2"]).getResult();
          eaf.getIframWin(window.frames["tbs3"]).getResult();
-         eaf.getIframWin(window.frames["acm_tbs_model"]).getResult();
+		//获取模型页面的返回值
+        var result = eaf.getIframWin(window.frames["acm_tbs_model"]).getResult();
+		//提示
+		var prompt;
+		if(result.flag){
+		   prompt="info";
+		}else if(result.flag){
+		   prompt="error";
+		}
+		$.messager.alert(result.inform,result.state,prompt)
     return 'EAFERR';
     }
 </script>
